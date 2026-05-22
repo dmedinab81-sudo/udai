@@ -1,0 +1,51 @@
+<?php
+require_once __DIR__ . '/../app/db.php';
+require_once __DIR__ . '/../app/auth.php';
+$pdo=getPDO();
+$estudiantes = $pdo->query("SELECT id, identificacion, nombres FROM estudiante ORDER BY nombres")->fetchAll();
+$asignaturas = $pdo->query("SELECT id, nombre FROM asignatura ORDER BY nombre")->fetchAll();
+$errors=[];
+if($_SERVER['REQUEST_METHOD']==='POST'){
+    $token = $_POST['csrf_token'] ?? null;
+    if (!verify_csrf_token($token)) { set_flash('Error de seguridad: token CSRF inválido.'); header('Location: estudiante_asignatura.php'); exit; }
+
+    $id_estudiante=intval($_POST['id_estudiante']??0);
+    $id_asignatura=intval($_POST['id_asignatura']??0);
+    $estado=trim($_POST['estado']??'');
+    if(!$id_estudiante||!$id_asignatura) $errors[]='Seleccione estudiante y asignatura.';
+    else {
+        $stmt=$pdo->prepare("INSERT INTO estudiante_asignatura (id_estudiante,id_asignatura,estado) VALUES (?,?,?)");
+        $stmt->execute([$id_estudiante,$id_asignatura,$estado]);
+        set_flash('Asignación creada.');
+        header('Location: estudiante_asignatura.php'); exit;
+    }
+}
+include __DIR__ . '/_header.php';
+?>
+<div class="row"><div class="col-md-6 mx-auto">
+<h2>Asignar Asignatura a Estudiante</h2>
+<?php foreach($errors as $er):?><div class="alert alert-danger"><?= htmlspecialchars($er) ?></div><?php endforeach; ?>
+<form method="post">
+  <?= csrf_input_html() ?>
+  <div class="mb-3"><label class="form-label">Estudiante</label>
+    <select class="form-select" name="id_estudiante">
+      <option value="">--</option>
+      <?php foreach($estudiantes as $es): ?>
+        <option value="<?= $es['id'] ?>" <?= (($_POST['id_estudiante']??'')==$es['id'])?'selected':'' ?>><?= htmlspecialchars($es['identificacion'].' - '.$es['nombres']) ?></option>
+      <?php endforeach; ?>
+    </select>
+  </div>
+  <div class="mb-3"><label class="form-label">Asignatura</label>
+    <select class="form-select" name="id_asignatura">
+      <option value="">--</option>
+      <?php foreach($asignaturas as $a): ?>
+        <option value="<?= $a['id'] ?>" <?= (($_POST['id_asignatura']??'')==$a['id'])?'selected':'' ?>><?= htmlspecialchars($a['nombre']) ?></option>
+      <?php endforeach; ?>
+    </select>
+  </div>
+  <div class="mb-3"><label class="form-label">Estado</label><input class="form-control" name="estado" value="<?= htmlspecialchars($_POST['estado'] ?? '') ?>"></div>
+  <button class="btn btn-primary">Crear</button>
+  <a class="btn btn-secondary" href="estudiante_asignatura.php">Cancelar</a>
+</form>
+</div></div>
+<?php include __DIR__ . '/_footer.php'; ?>

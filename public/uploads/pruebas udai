@@ -1,0 +1,1 @@
+curl -k -i -X OPTIONS "https://sais-hglp.saludzona5.gob.ec/sais/cliente_datos_udai.php?cedula=0919826974" | head -n 20
