@@ -64,6 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $jornada = trim($_POST['jornada'] ?? '');
     $nivel = trim($_POST['nivel'] ?? '');
     $grado = trim($_POST['grado'] ?? '');
+    $id_representante_principal = trim($_POST['id_representante_principal'] ?? '');
 
     // Validaciones
     if (empty($tipo_identificacion) || !in_array($tipo_identificacion, ['CEDULA_CIUDADANIA', 'CODIGO_ESTUDIANTE'])) {
@@ -155,45 +156,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }*/
 	
-		if (!empty($grado)) {
-		$grados_inicial = ['INICIAL_I', 'INICIAL_II'];
+	if (!empty($grado)) {
+	$grados_inicial = ['INICIAL_I', 'INICIAL_II'];
 
-		$grados_basica = [
-			'1ERO_EGB','2DO_EGB','3ERO_EGB','4TO_EGB','5TO_EGB',
-			'6TO_EGB','7MO_EGB','8VO_EGB','9NO_EGB','10MO_EGB'
-		];
+	$grados_basica = [
+		'1ERO_EGB','2DO_EGB','3ERO_EGB','4TO_EGB','5TO_EGB',
+		'6TO_EGB','7MO_EGB','8VO_EGB','9NO_EGB','10MO_EGB'
+	];
 
-		$grados_bachillerato = [
-			'1ERO_BACHILLERATO','2DO_BACHILLERATO','3ERO_BACHILLERATO'
-		];
+	$grados_bachillerato = [
+		'1ERO_BACHILLERATO','2DO_BACHILLERATO','3ERO_BACHILLERATO'
+	];
 
-		if ($nivel === 'INICIAL' && !in_array($grado, $grados_inicial)) {
-			$errors[] = "Grado inválido para nivel Inicial.";
-		} elseif ($nivel === 'BASICA' && !in_array($grado, $grados_basica)) {
-			$errors[] = "Grado inválido para nivel Básica.";
-		} elseif ($nivel === 'BACHILLERATO' && !in_array($grado, $grados_bachillerato)) {
-			$errors[] = "Grado inválido para nivel Bachillerato.";
-		}
+	if ($nivel === 'INICIAL' && !in_array($grado, $grados_inicial)) {
+		$errors[] = "Grado inválido para nivel Inicial.";
+	} elseif ($nivel === 'BASICA' && !in_array($grado, $grados_basica)) {
+		$errors[] = "Grado inválido para nivel Básica.";
+	} elseif ($nivel === 'BACHILLERATO' && !in_array($grado, $grados_bachillerato)) {
+		$errors[] = "Grado inválido para nivel Bachillerato.";
 	}
+}
 
+    // Validar representante si se seleccionó
+    if (!empty($id_representante_principal)) {
+        $stmt = $pdo->prepare("SELECT id FROM representante_legal WHERE id = ? LIMIT 1");
+        $stmt->execute([$id_representante_principal]);
+        if (!$stmt->fetch()) {
+            $errors[] = "Representante seleccionado no válido.";
+        }
+    }
 
     if (empty($errors)) {
         $stmt = $pdo->prepare("
             UPDATE estudiante
                SET tipo_identificacion=?,
-                   identificacion=?,
-                   nombres=?,
-                   fecha_nacimiento=?,
-                   edad=?,
-                   nee=?,
-                   tipo_nee=?,
-                   porcentaje_discapacidad=?,
-                   genero=?,
-                   jornada=?,
-                   nivel=?,
-                   grado=?
-             WHERE id=?
-        ");
+                    identificacion=?,
+                    nombres=?,
+                    fecha_nacimiento=?,
+                    edad=?,
+                    nee=?,
+                    tipo_nee=?,
+                    porcentaje_discapacidad=?,
+                    genero=?,
+                    jornada=?,
+                    nivel=?,
+                    grado=?,
+                    id_representante_principal=?
+              WHERE id=?
+         ");
 
         $stmt->execute([
             $tipo_identificacion,
@@ -208,6 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $jornada ?: null,
             $nivel ?: null,
             $grado ?: null,
+            $id_representante_principal ?: null,
             $id
         ]);
 
@@ -228,12 +239,20 @@ $nee_view = $_POST['nee'] ?? $e['nee'];
 $tipo_nee_view = $_POST['tipo_nee'] ?? $e['tipo_nee'];
 $porcentaje_discapacidad_view = $_POST['porcentaje_discapacidad'] ?? $e['porcentaje_discapacidad'];
 $porcentaje_discapacidad_view = ($porcentaje_discapacidad_view === null) ? '' : (string)$porcentaje_discapacidad_view;
-
+$id_representante_principal_view = $_POST['id_representante_principal'] ?? $e['id_representante_principal'];
 
 $genero_view = $_POST['genero'] ?? $e['genero'];
 $jornada_view = $_POST['jornada'] ?? $e['jornada'];
 $nivel_view = $_POST['nivel'] ?? $e['nivel'];
 $grado_view = $_POST['grado'] ?? $e['grado'];
+
+// Obtener datos del representante seleccionado
+$representante_actual = null;
+if (!empty($id_representante_principal_view)) {
+    $stmt = $pdo->prepare("SELECT id, cedula, nombres FROM representante_legal WHERE id = ? LIMIT 1");
+    $stmt->execute([$id_representante_principal_view]);
+    $representante_actual = $stmt->fetch(PDO::FETCH_ASSOC);
+}
 ?>
 
 <div class="row">
@@ -289,6 +308,24 @@ $grado_view = $_POST['grado'] ?? $e['grado'];
       </div>
 
       <div class="mb-3">
+        <label class="form-label">Representante Principal</label>
+        <div class="input-group">
+          <input 
+            class="form-control" 
+            id="buscar_representante" 
+            placeholder="Buscar por cédula o nombre..."
+            autocomplete="off"
+            value="<?= $representante_actual ? htmlspecialchars($representante_actual['nombres'] . ' (' . $representante_actual['cedula'] . ')') : '' ?>">
+          <button class="btn btn-outline-secondary" type="button" id="btn_limpiar_representante">Limpiar</button>
+        </div>
+        <div id="lista_representantes" class="list-group mt-2" style="display:none; max-height:300px; overflow-y:auto;"></div>
+        <input type="hidden" name="id_representante_principal" id="id_representante_principal" value="<?= htmlspecialchars($id_representante_principal_view ?? '') ?>">
+        <div id="representante_seleccionado" class="alert alert-info mt-2" style="display:<?= !empty($id_representante_principal_view) ? 'block' : 'none' ?>;">
+          <strong>✓ Representante seleccionado:</strong> <span id="rep_nombre"><?= $representante_actual ? htmlspecialchars($representante_actual['nombres']) : '' ?></span>
+        </div>
+      </div>
+
+      <div class="mb-3">
         <label class="form-label">NEE</label>
         <select class="form-control" name="nee" id="nee">
           <option value="">Seleccione...</option>
@@ -304,32 +341,7 @@ $grado_view = $_POST['grado'] ?? $e['grado'];
         </select>
       </div>
 
-      <!--div class="mb-3">
-	  <label class="form-label">% Discapacidad</label>
-
-	  <div class="row g-2">
-		<div class="col-md-4">
-		  <select class="form-control" id="porc_modo">
-			<option value="NO_APLICA" <?//= $porcentaje_discapacidad_view === 'NO_APLICA' ? 'selected' : '' ?>>NO APLICA</option>
-			<option value="PORCENTAJE" <?//= $porcentaje_discapacidad_view !== 'NO_APLICA' ? 'selected' : '' ?>>PORCENTAJE</option>
-		  </select>
-		</div>
-
-		<div class="col-md-8">
-		  <input class="form-control" type="number"
-				 id="porcentaje_discapacidad_num"
-				 min="0" max="100"
-				 value="<?//= $porcentaje_discapacidad_view !== 'NO_APLICA' ? htmlspecialchars($porcentaje_discapacidad_view) : '' ?>"
-				 placeholder="0 a 100">
-		  <!-- este es el que se envía al backend -->
-		  <!--input type="hidden" name="porcentaje_discapacidad" id="porcentaje_discapacidad"
-				 value="<?//= htmlspecialchars($porcentaje_discapacidad_view) ?>">
-		  <small class="form-text text-muted">Seleccione NO APLICA o ingrese un número entre 0 y 100</small>
-		</div>
-	  </div>
-	</div-->
-
-	<div class="mb-3">
+      <div class="mb-3">
 	  <label class="form-label">% Discapacidad</label>
 
 	  <select class="form-control" name="porcentaje_discapacidad" id="porcentaje_discapacidad">
@@ -391,21 +403,82 @@ $grado_view = $_POST['grado'] ?? $e['grado'];
 </div>
 
 <script>
-// Cambiar validación de identificación según tipo
-/*document.getElementById('tipo_identificacion').addEventListener('change', function() {
-  var identificacionInput = document.getElementById('identificacion');
-  var hint = document.getElementById('identificacion_hint');
+// ========== BÚSQUEDA AJAX DE REPRESENTANTES ==========
+const inputBuscar = document.getElementById('buscar_representante');
+const listaRepresentantes = document.getElementById('lista_representantes');
+const inputIdRepresentante = document.getElementById('id_representante_principal');
+const divRepresentanteSeleccionado = document.getElementById('representante_seleccionado');
+const btnLimpiar = document.getElementById('btn_limpiar_representante');
 
-  if (this.value === 'CEDULA_CIUDADANIA') {
-    identificacionInput.pattern = '[0-9]{1,10}';
-    identificacionInput.title = 'Solo números, máximo 10 dígitos';
-    hint.textContent = 'Solo números, máximo 10 dígitos';
-  } else if (this.value === 'CODIGO_ESTUDIANTE') {
-    identificacionInput.pattern = '[A-Za-z0-9]{1,10}';
-    identificacionInput.title = 'Letras y números, máximo 10 caracteres';
-    hint.textContent = 'Letras y números, máximo 10 caracteres';
+inputBuscar.addEventListener('input', function() {
+  const query = this.value.trim();
+  
+  if (query.length < 2) {
+    listaRepresentantes.style.display = 'none';
+    return;
   }
-});*/
+
+  // AJAX request
+  fetch('api/buscar_representantes.php?q=' + encodeURIComponent(query))
+    .then(response => response.json())
+    .then(data => {
+      if (data.success && data.representantes.length > 0) {
+        let html = '';
+        data.representantes.forEach(rep => {
+          html += `
+            <button type="button" class="list-group-item list-group-item-action" 
+                    data-id="${rep.id}" data-nombre="${rep.nombres}" data-cedula="${rep.cedula}">
+              <strong>${htmlEscape(rep.nombres)}</strong><br>
+              <small class="text-muted">Cédula: ${htmlEscape(rep.cedula)} | Tel: ${htmlEscape(rep.telefono)}</small>
+            </button>
+          `;
+        });
+        listaRepresentantes.innerHTML = html;
+        listaRepresentantes.style.display = 'block';
+
+        // Agregar event listeners a cada opción
+        document.querySelectorAll('#lista_representantes button').forEach(btn => {
+          btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            seleccionarRepresentante(this.dataset.id, this.dataset.nombre, this.dataset.cedula);
+          });
+        });
+      } else {
+        listaRepresentantes.innerHTML = '<div class="list-group-item text-muted">No se encontraron resultados</div>';
+        listaRepresentantes.style.display = 'block';
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      listaRepresentantes.innerHTML = '<div class="list-group-item text-danger">Error en la búsqueda</div>';
+      listaRepresentantes.style.display = 'block';
+    });
+});
+
+function seleccionarRepresentante(id, nombre, cedula) {
+  inputIdRepresentante.value = id;
+  inputBuscar.value = `${nombre} (${cedula})`;
+  listaRepresentantes.style.display = 'none';
+  
+  document.getElementById('rep_nombre').textContent = nombre;
+  divRepresentanteSeleccionado.style.display = 'block';
+}
+
+btnLimpiar.addEventListener('click', function() {
+  inputIdRepresentante.value = '';
+  inputBuscar.value = '';
+  listaRepresentantes.style.display = 'none';
+  divRepresentanteSeleccionado.style.display = 'none';
+});
+
+function htmlEscape(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ========== CÓDIGO EXISTENTE ==========
+// Cambiar validación de identificación según tipo
 document.getElementById('tipo_identificacion').addEventListener('change', function() {
   var identificacionInput = document.getElementById('identificacion');
   var hint = document.getElementById('identificacion_hint');
