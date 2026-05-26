@@ -3,12 +3,7 @@ require_once __DIR__ . '/../app/db.php';
 include __DIR__ . '/_header.php';
 
 $pdo = getPDO();
-$stmt = $pdo->query("
-  SELECT e.*, r.nombres as representante_nombres, r.cedula as representante_cedula
-  FROM estudiante e
-  LEFT JOIN representante_legal r ON e.id_representante_principal = r.id
-  ORDER BY e.id DESC
-");
+$stmt = $pdo->query("SELECT * FROM estudiante ORDER BY id DESC");
 $estudiantes = $stmt->fetchAll();
 ?>
 <div class="row">
@@ -16,7 +11,7 @@ $estudiantes = $stmt->fetchAll();
     <h2>Estudiantes <a href="estudiante_create.php" class="btn btn-sm btn-success float-end">Crear</a></h2>
     <table class="table table-striped">
       <thead>
-        <tr><th>ID</th><th>Tipo ID</th><th>Identificación</th><th>Nombres</th><th>Fecha Nac.</th><th>Edad</th><th>Representante</th><th>Acciones</th></tr>
+        <tr><th>ID</th><th>Tipo ID</th><th>Identificación</th><th>Nombres</th><th>Fecha Nac.</th><th>Edad</th><th>Acciones</th></tr>
       </thead>
       <tbody>
         <?php foreach ($estudiantes as $e): ?>
@@ -27,14 +22,6 @@ $estudiantes = $stmt->fetchAll();
             <td><?= htmlspecialchars($e['nombres']) ?></td>
             <td><?= htmlspecialchars($e['fecha_nacimiento']) ?></td>
             <td><?= htmlspecialchars($e['edad']) ?></td>
-            <td>
-              <?php if (!empty($e['representante_nombres'])): ?>
-                <span class="badge bg-info"><?= htmlspecialchars($e['representante_nombres']) ?></span><br>
-                <small class="text-muted">Cédula: <?= htmlspecialchars($e['representante_cedula']) ?></small>
-              <?php else: ?>
-                <span class="text-muted">-</span>
-              <?php endif; ?>
-            </td>
             <td>
               <a class="btn btn-sm btn-primary" href="estudiante_edit.php?id=<?= $e['id'] ?>">Editar</a>
 

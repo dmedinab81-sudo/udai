@@ -7,3 +7,13 @@ ADD COLUMN id_representante_principal INT(11) NULL DEFAULT NULL AFTER grado,
 ADD INDEX idx_id_representante_principal (id_representante_principal) USING BTREE,
 ADD CONSTRAINT fk_estudiante_representante FOREIGN KEY (id_representante_principal) 
   REFERENCES representante_legal (id) ON DELETE SET NULL ON UPDATE CASCADE;
+
+
+ALTER TABLE estudiante
+  ADD COLUMN id_docente_tutor INT(11) NULL DEFAULT NULL AFTER id_representante_principal,
+  ADD INDEX idx_id_docente_tutor (id_docente_tutor) USING BTREE,
+  ADD CONSTRAINT fk_estudiante_docente_tutor
+    FOREIGN KEY (id_docente_tutor)
+    REFERENCES docente_tutor (id)
+    ON DELETE SET NULL
+    ON UPDATE CASCADE;
