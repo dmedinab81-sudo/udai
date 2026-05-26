@@ -38,9 +38,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tipo_nee = trim($_POST['tipo_nee'] ?? '');
     $porcentaje_discapacidad = trim($_POST['porcentaje_discapacidad'] ?? '');
     $genero = trim($_POST['genero'] ?? '');
-    $jornada = trim($_POST['jornada'] ?? '');
-    $nivel = trim($_POST['nivel'] ?? '');
-    $grado = trim($_POST['grado'] ?? '');
+	    $jornada = trim($_POST['jornada'] ?? '');
+	    $nivel = trim($_POST['nivel'] ?? '');
+	    $grado = trim($_POST['grado'] ?? '');
+	    $id_representante_principal = trim($_POST['id_representante_principal'] ?? '');
 
     // Validaciones
     if (empty($tipo_identificacion) || !in_array($tipo_identificacion, ['CEDULA_CIUDADANIA', 'CODIGO_ESTUDIANTE'])) {
@@ -144,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }*/
 	
-	if (!empty($grado)) {
+		if (!empty($grado)) {
 		$grados_inicial = ['INICIAL_I', 'INICIAL_II'];
 
 		$grados_basica = [
@@ -163,13 +164,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		} elseif ($nivel === 'BACHILLERATO' && !in_array($grado, $grados_bachillerato)) {
 			$errors[] = "Grado inválido para nivel Bachillerato.";
 		}
-	}
+		}
 
+		// Validar representante si se seleccionó
+		if (!empty($id_representante_principal)) {
+			$pdo = getPDO();
+			$stmt = $pdo->prepare("SELECT id FROM representante_legal WHERE id = ? LIMIT 1");
+			$stmt->execute([$id_representante_principal]);
+			if (!$stmt->fetch()) {
+				$errors[] = "Representante seleccionado no válido.";
+			}
+		}
+	
 
-    if (empty($errors)) {
-        $pdo = getPDO();
-        $stmt = $pdo->prepare("INSERT INTO estudiante (tipo_identificacion, identificacion, nombres, fecha_nacimiento, edad, nee, tipo_nee, porcentaje_discapacidad, genero, jornada, nivel, grado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
-        $stmt->execute([$tipo_identificacion, $identificacion, $nombres, $fecha_nacimiento ?: null, $edad ?: null, $nee ?: null, $tipo_nee ?: null, $porcentaje_discapacidad ?: null, $genero ?: null, $jornada ?: null, $nivel ?: null, $grado ?: null]);
+	    if (empty($errors)) {
+	        $pdo = getPDO();
+	        $stmt = $pdo->prepare("INSERT INTO estudiante (tipo_identificacion, identificacion, nombres, fecha_nacimiento, edad, nee, tipo_nee, porcentaje_discapacidad, genero, jornada, nivel, grado, id_representante_principal) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+	        $stmt->execute([$tipo_identificacion, $identificacion, $nombres, $fecha_nacimiento ?: null, $edad ?: null, $nee ?: null, $tipo_nee ?: null, $porcentaje_discapacidad ?: null, $genero ?: null, $jornada ?: null, $nivel ?: null, $grado ?: null, $id_representante_principal ?: null]);
         set_flash('Estudiante creado.');
         header('Location: estudiantes.php');
         exit;
@@ -218,17 +229,35 @@ include __DIR__ . '/_header.php';
         <input class="form-control" name="nombres" id="nombres" required value="<?= htmlspecialchars($_POST['nombres'] ?? '') ?>">
       </div>
 
-      <div class="mb-3 row">
-        <div class="col">
-          <label class="form-label">Fecha Nacimiento</label>
-          <input class="form-control" type="date" name="fecha_nacimiento" id="fecha_nacimiento" value="<?= htmlspecialchars($_POST['fecha_nacimiento'] ?? '') ?>">
-        </div>
-        <div class="col">
-          <label class="form-label">Edad</label>
-          <input class="form-control" type="number" name="edad" id="edad" readonly value="<?= htmlspecialchars($_POST['edad'] ?? '') ?>">
-          <small class="form-text text-muted">Se calcula automáticamente</small>
-        </div>
-      </div>
+	      <div class="mb-3 row">
+	        <div class="col">
+	          <label class="form-label">Fecha Nacimiento</label>
+	          <input class="form-control" type="date" name="fecha_nacimiento" id="fecha_nacimiento" value="<?= htmlspecialchars($_POST['fecha_nacimiento'] ?? '') ?>">
+	        </div>
+	        <div class="col">
+	          <label class="form-label">Edad</label>
+	          <input class="form-control" type="number" name="edad" id="edad" readonly value="<?= htmlspecialchars($_POST['edad'] ?? '') ?>">
+	          <small class="form-text text-muted">Se calcula automáticamente</small>
+	        </div>
+	      </div>
+
+	      <div class="mb-3">
+	        <label class="form-label">Representante Principal</label>
+	        <div class="input-group">
+	          <input
+	            class="form-control"
+	            id="buscar_representante"
+	            placeholder="Buscar por cédula o nombre..."
+	            autocomplete="off"
+	            value="">
+	          <button class="btn btn-outline-secondary" type="button" id="btn_limpiar_representante">Limpiar</button>
+	        </div>
+	        <div id="lista_representantes" class="list-group mt-2" style="display:none; max-height:300px; overflow-y:auto;"></div>
+	        <input type="hidden" name="id_representante_principal" id="id_representante_principal" value="<?= htmlspecialchars($_POST['id_representante_principal'] ?? '') ?>">
+	        <div id="representante_seleccionado" class="alert alert-info mt-2" style="display:none;">
+	          <strong>✓ Representante seleccionado:</strong> <span id="rep_nombre"></span>
+	        </div>
+	      </div>
 
       <div class="mb-3">
         <label class="form-label">NEE</label>
@@ -307,6 +336,75 @@ include __DIR__ . '/_header.php';
 </div>
 
 <script>
+// ========== BÚSQUEDA AJAX DE REPRESENTANTES ==========
+const inputBuscar = document.getElementById('buscar_representante');
+const listaRepresentantes = document.getElementById('lista_representantes');
+const inputIdRepresentante = document.getElementById('id_representante_principal');
+const divRepresentanteSeleccionado = document.getElementById('representante_seleccionado');
+const btnLimpiar = document.getElementById('btn_limpiar_representante');
+
+inputBuscar.addEventListener('input', function() {
+  const query = this.value.trim();
+  if (query.length < 2) {
+    listaRepresentantes.style.display = 'none';
+    return;
+  }
+
+  fetch('api/buscar_representantes.php?q=' + encodeURIComponent(query))
+    .then(response => response.json())
+    .then(data => {
+      if (data.success && data.representantes.length > 0) {
+        let html = '';
+        data.representantes.forEach(rep => {
+          html += `
+            <button type="button" class="list-group-item list-group-item-action"
+                    data-id="${rep.id}" data-nombre="${rep.nombres}" data-cedula="${rep.cedula}">
+              <strong>${htmlEscape(rep.nombres)}</strong><br>
+              <small class="text-muted">Cédula: ${htmlEscape(rep.cedula)} | Tel: ${htmlEscape(rep.telefono)}</small>
+            </button>
+          `;
+        });
+        listaRepresentantes.innerHTML = html;
+        listaRepresentantes.style.display = 'block';
+
+        document.querySelectorAll('#lista_representantes button').forEach(btn => {
+          btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            seleccionarRepresentante(this.dataset.id, this.dataset.nombre, this.dataset.cedula);
+          });
+        });
+      } else {
+        listaRepresentantes.innerHTML = '<div class="list-group-item text-muted">No se encontraron resultados</div>';
+        listaRepresentantes.style.display = 'block';
+      }
+    })
+    .catch(() => {
+      listaRepresentantes.innerHTML = '<div class="list-group-item text-danger">Error en la búsqueda</div>';
+      listaRepresentantes.style.display = 'block';
+    });
+});
+
+function seleccionarRepresentante(id, nombre, cedula) {
+  inputIdRepresentante.value = id;
+  inputBuscar.value = `${nombre} (${cedula})`;
+  listaRepresentantes.style.display = 'none';
+  document.getElementById('rep_nombre').textContent = nombre;
+  divRepresentanteSeleccionado.style.display = 'block';
+}
+
+btnLimpiar.addEventListener('click', function() {
+  inputIdRepresentante.value = '';
+  inputBuscar.value = '';
+  listaRepresentantes.style.display = 'none';
+  divRepresentanteSeleccionado.style.display = 'none';
+});
+
+function htmlEscape(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 // Cambiar validación de identificación según tipo
 document.getElementById('tipo_identificacion').addEventListener('change', function() {
   var identificacionInput = document.getElementById('identificacion');
