@@ -108,7 +108,7 @@ $logo_url = BASE_URL . 'assets/logo.png';
               </ul>
           </li>
           <li class="nav-item">
-            <a class="nav-link <?= nav_active('registro_nee') ?>" href="<?= BASE_URL ?>registro_nee.php">Registros NEE</a>
+            <a class="nav-link <?= nav_active('registro_nee') ?>" href="<?= BASE_URL ?>registro_nee.php">Registros de Atención</a>
           </li>
           <li class="nav-item">
             <a class="nav-link <?= nav_active('report_nee') || nav_active('report_nee.php') ? 'active' : '' ?>" href="<?= BASE_URL ?>report_nee.php">Reportes</a>

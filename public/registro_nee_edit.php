@@ -12,7 +12,7 @@ $docentes_apoyo=$pdo->query("SELECT id, nombres FROM docente_apoyo ORDER BY nomb
 $instituciones=$pdo->query("SELECT id, nombre FROM institucion ORDER BY nombre")->fetchAll();
 $estudiantes=$pdo->query("SELECT id, nombres FROM estudiante ORDER BY nombres")->fetchAll();
 $docentes_tutor=$pdo->query("SELECT id, nombres FROM docente_tutor ORDER BY nombres")->fetchAll();
-$representantes=$pdo->query("SELECT id, nombres FROM representante_legal ORDER BY nombres")->fetchAll();
+function labelById(PDO $pdo, string $table, int $id, string $labelExpr='nombres'): string { if ($id <= 0) return ''; $stmt = $pdo->prepare("SELECT $labelExpr as label FROM $table WHERE id=? LIMIT 1"); $stmt->execute([$id]); return (string)($stmt->fetchColumn() ?: ''); }
 
 $errors=[];
 if($_SERVER['REQUEST_METHOD']==='POST'){
@@ -26,19 +26,12 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     $id_docente_tutor=intval($_POST['id_docente_tutor']??0);
     $id_representante=intval($_POST['id_representante']??0);
 
+    $num_atenciones_estudiante=intval($_POST['num_atenciones_estudiante'] ?? 0);
+    $num_atenciones_representante=intval($_POST['num_atenciones_representante'] ?? 0);
+    $num_atenciones_docente=intval($_POST['num_atenciones_docente'] ?? 0);
+    $num_docentes_estudiante=intval($_POST['num_docentes_estudiante'] ?? 0);
+
     // nuevos campos
-    $docente_tutor = intval($_POST['docente_tutor'] ?? 0);
-    $lengua_y_literatura = intval($_POST['lengua_y_literatura'] ?? 0);
-    $matematica = intval($_POST['matematica'] ?? 0);
-    $ciencias_naturales = intval($_POST['ciencias_naturales'] ?? 0);
-    $fisica = intval($_POST['fisica'] ?? 0);
-    $quimica = intval($_POST['quimica'] ?? 0);
-    $biologia = intval($_POST['biologia'] ?? 0);
-    $estudios_sociales_historia = intval($_POST['estudios_sociales_historia'] ?? 0);
-    $ingles = intval($_POST['ingles'] ?? 0);
-    $educacion_fisica = intval($_POST['educacion_fisica'] ?? 0);
-    $gestion_para_el_emprendimiento = intval($_POST['gestion_para_el_emprendimiento'] ?? 0);
-    $filosofia = intval($_POST['filosofia'] ?? 0);
 
     $enlace_gestion=trim($_POST['enlace_gestion']??'');
     $observaciones=trim($_POST['observaciones']??'');
@@ -52,20 +45,20 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
 	if(empty($errors)){
 		$stmt=$pdo->prepare("UPDATE registro_nee SET
 			id_ubicacion=?, id_docente_apoyo=?, id_institucion=?, id_estudiante=?, id_docente_tutor=?, id_representante=?,
-			docente_tutor=?, lengua_y_literatura=?, matematica=?, ciencias_naturales=?, fisica=?, quimica=?, biologia=?, estudios_sociales_historia=?, ingles=?, educacion_fisica=?, gestion_para_el_emprendimiento=?, filosofia=?,
+			num_atenciones_estudiante=?, num_atenciones_representante=?, num_atenciones_docente=?, num_docentes_estudiante=?,
 			enlace_gestion=?, observaciones=?,
 			actualizado_por=?, actualizado_en=NOW()
 		WHERE id=?");
 
 		$stmt->execute([
 			$id_ubicacion?:null,$id_docente_apoyo?:null,$id_institucion?:null,$id_estudiante?:null,$id_docente_tutor?:null,$id_representante?:null,
-			$docente_tutor,$lengua_y_literatura,$matematica,$ciencias_naturales,$fisica,$quimica,$biologia,$estudios_sociales_historia,$ingles,$educacion_fisica,$gestion_para_el_emprendimiento,$filosofia,
+			$num_atenciones_estudiante,$num_atenciones_representante,$num_atenciones_docente,$num_docentes_estudiante,
 			$enlace_gestion?:null,$observaciones?:null,
 			$usuario_id,
 			$id
 		]);
 
-		set_flash('Registro NEE actualizado.');
+		set_flash('Registro de Atención actualizado.');
 		header('Location: registro_nee.php'); exit;
     }
 }
@@ -77,55 +70,29 @@ function select_si_no($name, $value) {
 }
 ?>
 <div class="row"><div class="col-md-8 mx-auto">
-<h2>Editar Registro NEE</h2>
+<h2>Editar Registro de Atención</h2>
 <?php foreach($errors as $er):?><div class="alert alert-danger"><?= htmlspecialchars($er) ?></div><?php endforeach; ?>
 <form method="post">
   <?= csrf_input_html() ?>
-  <div class="mb-3"><label class="form-label">Periodo</label>
-    <select class="form-select" name="id_ubicacion">
-      <option value="">--</option>
-      <?php foreach($ubicaciones as $u): ?><option value="<?= $u['id'] ?>" <?= (($row['id_ubicacion']==$u['id'])|| (($_POST['id_ubicacion']??'')==$u['id']))?'selected':'' ?>><?= htmlspecialchars($u['mes']) ?></option><?php endforeach; ?>
-    </select>
-  </div>
+  <div class="mb-3"><label class="form-label">Periodo</label><input class="form-control ajax-buscar" data-tipo="periodo" data-target="id_ubicacion" value="<?= htmlspecialchars(labelById($pdo,'ubicacion',intval($_POST['id_ubicacion'] ?? $row['id_ubicacion']),'mes')) ?>" placeholder="Buscar periodo..."><input type="hidden" name="id_ubicacion" id="id_ubicacion" value="<?= intval($_POST['id_ubicacion'] ?? $row['id_ubicacion']) ?>"><div class="list-group mt-1 ajax-lista"></div></div>
 
-  <div class="mb-3"><label class="form-label">Docente Apoyo</label>
-    <select class="form-select" name="id_docente_apoyo"><option value="">--</option><?php foreach($docentes_apoyo as $d):?><option value="<?= $d['id'] ?>" <?= (($row['id_docente_apoyo']==$d['id'])|| (($_POST['id_docente_apoyo']??'')==$d['id']))?'selected':'' ?>><?= htmlspecialchars($d['nombres']) ?></option><?php endforeach;?></select>
-  </div>
+  <div class="mb-3"><label class="form-label">Docente Apoyo</label><input class="form-control ajax-buscar" data-tipo="docente_apoyo" data-target="id_docente_apoyo" value="<?= htmlspecialchars(labelById($pdo,'docente_apoyo',intval($_POST['id_docente_apoyo'] ?? $row['id_docente_apoyo']))) ?>" placeholder="Buscar docente apoyo..."><input type="hidden" name="id_docente_apoyo" id="id_docente_apoyo" value="<?= intval($_POST['id_docente_apoyo'] ?? $row['id_docente_apoyo']) ?>"><div class="list-group mt-1 ajax-lista"></div></div>
 
-  <div class="mb-3"><label class="form-label">Institución</label>
-    <select class="form-select" name="id_institucion"><option value="">--</option><?php foreach($instituciones as $i):?><option value="<?= $i['id'] ?>" <?= (($row['id_institucion']==$i['id'])|| (($_POST['id_institucion']??'')==$i['id']))?'selected':'' ?>><?= htmlspecialchars($i['nombre']) ?></option><?php endforeach;?></select>
-  </div>
+  <div class="mb-3"><label class="form-label">Institución</label><input class="form-control ajax-buscar" data-tipo="institucion" data-target="id_institucion" value="<?= htmlspecialchars(labelById($pdo,'institucion',intval($_POST['id_institucion'] ?? $row['id_institucion']),'nombre')) ?>" placeholder="Buscar institución..."><input type="hidden" name="id_institucion" id="id_institucion" value="<?= intval($_POST['id_institucion'] ?? $row['id_institucion']) ?>"><div class="list-group mt-1 ajax-lista"></div></div>
 
-  <div class="mb-3"><label class="form-label">Estudiante</label>
-    <select class="form-select" name="id_estudiante"><option value="">--</option><?php foreach($estudiantes as $e):?><option value="<?= $e['id'] ?>" <?= (($row['id_estudiante']==$e['id'])|| (($_POST['id_estudiante']??'')==$e['id']))?'selected':'' ?>><?= htmlspecialchars($e['nombres']) ?></option><?php endforeach;?></select>
-  </div>
+  <div class="mb-3"><label class="form-label">Estudiante</label><input class="form-control ajax-buscar" data-tipo="estudiante" data-target="id_estudiante" value="<?= htmlspecialchars(labelById($pdo,'estudiante',intval($_POST['id_estudiante'] ?? $row['id_estudiante']))) ?>" placeholder="Buscar estudiante..."><input type="hidden" name="id_estudiante" id="id_estudiante" value="<?= intval($_POST['id_estudiante'] ?? $row['id_estudiante']) ?>"><div class="list-group mt-1 ajax-lista"></div></div>
 
-  <div class="mb-3"><label class="form-label">Docente Tutor</label>
-    <select class="form-select" name="id_docente_tutor"><option value="">--</option><?php foreach($docentes_tutor as $dt):?><option value="<?= $dt['id'] ?>" <?= (($row['id_docente_tutor']==$dt['id'])|| (($_POST['id_docente_tutor']??'')==$dt['id']))?'selected':'' ?>><?= htmlspecialchars($dt['nombres']) ?></option><?php endforeach;?></select>
-  </div>
+  <div class="mb-3"><label class="form-label">Docente Tutor</label><input class="form-control ajax-buscar" data-tipo="docente_tutor" data-target="id_docente_tutor" value="<?= htmlspecialchars(labelById($pdo,'docente_tutor',intval($_POST['id_docente_tutor'] ?? $row['id_docente_tutor']))) ?>" placeholder="Buscar docente tutor..."><input type="hidden" name="id_docente_tutor" id="id_docente_tutor" value="<?= intval($_POST['id_docente_tutor'] ?? $row['id_docente_tutor']) ?>"><div class="list-group mt-1 ajax-lista"></div></div>
 
-  <div class="mb-3"><label class="form-label">Representante</label>
-    <select class="form-select" name="id_representante"><option value="">--</option><?php foreach($representantes as $r):?><option value="<?= $r['id'] ?>" <?= (($row['id_representante']==$r['id'])|| (($_POST['id_representante']??'')==$r['id']))?'selected':'' ?>><?= htmlspecialchars($r['nombres']) ?></option><?php endforeach;?></select>
-  </div>
+  <div class="mb-3"><label class="form-label">Representante</label><input class="form-control ajax-buscar" data-tipo="representante" data-target="id_representante" value="<?= htmlspecialchars(labelById($pdo,'representante_legal',intval($_POST['id_representante'] ?? $row['id_representante']))) ?>" placeholder="Buscar representante..."><input type="hidden" name="id_representante" id="id_representante" value="<?= intval($_POST['id_representante'] ?? $row['id_representante']) ?>"><div class="list-group mt-1 ajax-lista"></div></div>
 
   <fieldset class="border rounded p-3 mb-3">
-    <legend class="small px-2">Atención a docentes por asignatura</legend>
+    <legend class="small px-2">Número de atenciones mensuales realizadas</legend>
     <div class="row g-2">
-      <?php
-      $fields = [
-        'docente_tutor'=>'Docente Tutor','lengua_y_literatura'=>'Lengua y Literatura','matematica'=>'Matemática',
-        'ciencias_naturales'=>'Ciencias Naturales','fisica'=>'Física','quimica'=>'Química','biologia'=>'Biología',
-        'estudios_sociales_historia'=>'Estudios Sociales / Historia','ingles'=>'Inglés','educacion_fisica'=>'Educación Física',
-        'gestion_para_el_emprendimiento'=>'Gestión para el emprendimiento','filosofia'=>'Filosofía'
-      ];
-      foreach ($fields as $fname => $flabel):
-        $val = isset($_POST[$fname]) ? intval($_POST[$fname]) : intval($row[$fname] ?? 0);
-      ?>
-      <div class="col-md-6">
-        <label class="form-label"><?= htmlspecialchars($flabel) ?></label>
-        <?= select_si_no($fname, $val) ?>
-      </div>
-      <?php endforeach; ?>
+      <div class="col-md-6"><label class="form-label">Estudiante</label><input type="number" min="0" step="1" class="form-control" name="num_atenciones_estudiante" value="<?= htmlspecialchars($_POST['num_atenciones_estudiante'] ?? ($row['num_atenciones_estudiante'] ?? 0)) ?>"></div>
+      <div class="col-md-6"><label class="form-label">Padre, Madre de familia o Representante legal</label><input type="number" min="0" step="1" class="form-control" name="num_atenciones_representante" value="<?= htmlspecialchars($_POST['num_atenciones_representante'] ?? ($row['num_atenciones_representante'] ?? 0)) ?>"></div>
+      <div class="col-md-6"><label class="form-label">Docente</label><input type="number" min="0" step="1" class="form-control" name="num_atenciones_docente" value="<?= htmlspecialchars($_POST['num_atenciones_docente'] ?? ($row['num_atenciones_docente'] ?? 0)) ?>"></div>
+      <div class="col-md-6"><label class="form-label">Número de docentes del estudiante</label><input type="number" min="0" step="1" class="form-control" name="num_docentes_estudiante" value="<?= htmlspecialchars($_POST['num_docentes_estudiante'] ?? ($row['num_docentes_estudiante'] ?? 0)) ?>"></div>
     </div>
   </fieldset>
 
@@ -135,4 +102,17 @@ function select_si_no($name, $value) {
   <a class="btn btn-secondary" href="registro_nee.php">Cancelar</a>
 </form>
 </div></div>
+
+<script>
+document.querySelectorAll('.ajax-buscar').forEach(input => {
+  const lista = input.parentElement.querySelector('.ajax-lista');
+  const target = document.getElementById(input.dataset.target);
+  input.addEventListener('input', function() {
+    const q = this.value.trim(); if (q.length < 2) { lista.innerHTML=''; return; }
+    fetch('api/buscar_catalogo.php?tipo='+encodeURIComponent(this.dataset.tipo)+'&q='+encodeURIComponent(q))
+      .then(r=>r.json()).then(d=>{ lista.innerHTML=''; (d.items||[]).forEach(it=>{ const b=document.createElement('button'); b.type='button'; b.className='list-group-item list-group-item-action'; b.textContent=it.label; b.onclick=()=>{input.value=it.label; target.value=it.id; lista.innerHTML='';}; lista.appendChild(b); });});
+  });
+});
+</script>
+
 <?php include __DIR__ . '/_footer.php'; ?>

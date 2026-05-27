@@ -6,17 +6,24 @@ include __DIR__ . '/_header.php';
 $pdo = getPDO();
 
 // -------------------- Filtros (GET) --------------------
+$id_ubicacion = isset($_GET['id_ubicacion']) && $_GET['id_ubicacion'] !== '' ? (int)$_GET['id_ubicacion'] : null;
 $id_docente_apoyo = isset($_GET['id_docente_apoyo']) && $_GET['id_docente_apoyo'] !== '' ? (int)$_GET['id_docente_apoyo'] : null;
 $id_institucion   = isset($_GET['id_institucion']) && $_GET['id_institucion'] !== '' ? (int)$_GET['id_institucion'] : null;
+$id_estudiante    = isset($_GET['id_estudiante']) && $_GET['id_estudiante'] !== '' ? (int)$_GET['id_estudiante'] : null;
+$id_docente_tutor = isset($_GET['id_docente_tutor']) && $_GET['id_docente_tutor'] !== '' ? (int)$_GET['id_docente_tutor'] : null;
+$id_representante = isset($_GET['id_representante']) && $_GET['id_representante'] !== '' ? (int)$_GET['id_representante'] : null;
 
 // Listas para combos
-$docentes_apoyo = $pdo->query("SELECT id, nombres FROM docente_apoyo ORDER BY nombres")->fetchAll(PDO::FETCH_ASSOC);
-$instituciones  = $pdo->query("SELECT id, nombre FROM institucion ORDER BY nombre")->fetchAll(PDO::FETCH_ASSOC);
+function labelById(PDO $pdo, string $table, ?int $id, string $label='nombres'): string {
+  if (!$id) return '';
+  $stmt=$pdo->prepare("SELECT $label FROM $table WHERE id=? LIMIT 1"); $stmt->execute([$id]); return (string)($stmt->fetchColumn() ?: '');
+}
 
 // Construir WHERE dinámico
 $where = [];
 $params = [];
 
+if ($id_ubicacion) { $where[] = "rn.id_ubicacion = ?"; $params[] = $id_ubicacion; }
 if ($id_docente_apoyo) {
   $where[] = "rn.id_docente_apoyo = ?";
   $params[] = $id_docente_apoyo;
@@ -25,6 +32,9 @@ if ($id_institucion) {
   $where[] = "rn.id_institucion = ?";
   $params[] = $id_institucion;
 }
+if ($id_estudiante) { $where[] = "rn.id_estudiante = ?"; $params[] = $id_estudiante; }
+if ($id_docente_tutor) { $where[] = "rn.id_docente_tutor = ?"; $params[] = $id_docente_tutor; }
+if ($id_representante) { $where[] = "rn.id_representante = ?"; $params[] = $id_representante; }
 
 $where_sql = !empty($where) ? ("WHERE " . implode(" AND ", $where)) : "";
 
@@ -54,60 +64,21 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// función auxiliar para listar asignaturas activas en un registro
-function asignaturas_list(array $r): string {
-    $map = [
-        'docente_tutor' => 'Docente Tutor',
-        'lengua_y_literatura' => 'Lengua y Literatura',
-        'matematica' => 'Matemática',
-        'ciencias_naturales' => 'Ciencias Naturales',
-        'fisica' => 'Física',
-        'quimica' => 'Química',
-        'biologia' => 'Biología',
-        'estudios_sociales_historia' => 'Estudios Sociales / Historia',
-        'ingles' => 'Inglés',
-        'educacion_fisica' => 'Educación Física',
-        'gestion_para_el_emprendimiento' => 'Gestión para el emprendimiento',
-        'filosofia' => 'Filosofía'
-    ];
-    $out = [];
-    foreach ($map as $field => $label) {
-        if (!empty($r[$field])) $out[] = $label;
-    }
-    return implode(', ', $out);
-}
 ?>
 
 <div class="row"><div class="col-12">
-  <h2>Registros NEE
+  <h2>Registros de Atención
     <a href="registro_nee_create.php" class="btn btn-sm btn-success float-end">Crear</a>
   </h2>
 
   <!-- -------------------- Filtros UI -------------------- -->
   <form method="get" class="row gy-2 gx-2 align-items-end mb-3">
-    <div class="col-md-4">
-      <label class="form-label">Docente Apoyo</label>
-      <select name="id_docente_apoyo" class="form-select">
-        <option value="">-- Todos --</option>
-        <?php foreach ($docentes_apoyo as $d): ?>
-          <option value="<?= (int)$d['id'] ?>" <?= ($id_docente_apoyo && $id_docente_apoyo == $d['id']) ? 'selected' : '' ?>>
-            <?= htmlspecialchars($d['nombres']) ?>
-          </option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-
-    <div class="col-md-5">
-      <label class="form-label">Institución</label>
-      <select name="id_institucion" class="form-select">
-        <option value="">-- Todas --</option>
-        <?php foreach ($instituciones as $i): ?>
-          <option value="<?= (int)$i['id'] ?>" <?= ($id_institucion && $id_institucion == $i['id']) ? 'selected' : '' ?>>
-            <?= htmlspecialchars($i['nombre']) ?>
-          </option>
-        <?php endforeach; ?>
-      </select>
-    </div>
+    <div class="col-md-4"><label class="form-label">Periodo</label><input class="form-control ajax-buscar" data-tipo="periodo" data-target="id_ubicacion" value="<?= htmlspecialchars(labelById($pdo,'ubicacion',$id_ubicacion,'mes')) ?>"><input type="hidden" name="id_ubicacion" id="id_ubicacion" value="<?= (int)$id_ubicacion ?>"><div class="list-group ajax-lista mt-1"></div></div>
+    <div class="col-md-4"><label class="form-label">Docente Apoyo</label><input class="form-control ajax-buscar" data-tipo="docente_apoyo" data-target="id_docente_apoyo" value="<?= htmlspecialchars(labelById($pdo,'docente_apoyo',$id_docente_apoyo)) ?>"><input type="hidden" name="id_docente_apoyo" id="id_docente_apoyo" value="<?= (int)$id_docente_apoyo ?>"><div class="list-group ajax-lista mt-1"></div></div>
+    <div class="col-md-4"><label class="form-label">Institución</label><input class="form-control ajax-buscar" data-tipo="institucion" data-target="id_institucion" value="<?= htmlspecialchars(labelById($pdo,'institucion',$id_institucion,'nombre')) ?>"><input type="hidden" name="id_institucion" id="id_institucion" value="<?= (int)$id_institucion ?>"><div class="list-group ajax-lista mt-1"></div></div>
+    <div class="col-md-4"><label class="form-label">Estudiante</label><input class="form-control ajax-buscar" data-tipo="estudiante" data-target="id_estudiante" value="<?= htmlspecialchars(labelById($pdo,'estudiante',$id_estudiante)) ?>"><input type="hidden" name="id_estudiante" id="id_estudiante" value="<?= (int)$id_estudiante ?>"><div class="list-group ajax-lista mt-1"></div></div>
+    <div class="col-md-4"><label class="form-label">Docente Tutor</label><input class="form-control ajax-buscar" data-tipo="docente_tutor" data-target="id_docente_tutor" value="<?= htmlspecialchars(labelById($pdo,'docente_tutor',$id_docente_tutor)) ?>"><input type="hidden" name="id_docente_tutor" id="id_docente_tutor" value="<?= (int)$id_docente_tutor ?>"><div class="list-group ajax-lista mt-1"></div></div>
+    <div class="col-md-4"><label class="form-label">Representante</label><input class="form-control ajax-buscar" data-tipo="representante" data-target="id_representante" value="<?= htmlspecialchars(labelById($pdo,'representante_legal',$id_representante)) ?>"><input type="hidden" name="id_representante" id="id_representante" value="<?= (int)$id_representante ?>"><div class="list-group ajax-lista mt-1"></div></div>
 
     <div class="col-md-3 d-flex gap-2">
       <button type="submit" class="btn btn-primary w-100">Filtrar</button>
@@ -123,7 +94,7 @@ function asignaturas_list(array $r): string {
         <th>Docente Apoyo</th>
         <th>Institución</th>
         <th>Estudiante</th>
-        <th>Asignaturas</th>
+        <th>Atenciones (E/R/D/ND)</th>
         <th>Creado por</th>
         <th>Creado en</th>
         <th>Actualizado por</th>
@@ -141,7 +112,7 @@ function asignaturas_list(array $r): string {
           <td><?= htmlspecialchars($it['docente_apoyo_nom'] ?? '') ?></td>
           <td><?= htmlspecialchars($it['institucion_nom'] ?? '') ?></td>
           <td><?= htmlspecialchars($it['estudiante_nom'] ?? '') ?></td>
-          <td style="max-width:320px;"><?= htmlspecialchars(asignaturas_list($it)) ?></td>
+          <td><?= (int)($it['num_atenciones_estudiante'] ?? 0) ?>/<?= (int)($it['num_atenciones_representante'] ?? 0) ?>/<?= (int)($it['num_atenciones_docente'] ?? 0) ?>/<?= (int)($it['num_docentes_estudiante'] ?? 0) ?></td>
 
           <td><?= htmlspecialchars($it['creado_por_nombre'] ?? '') ?></td>
           <td><?= htmlspecialchars($it['creado_en'] ?? '') ?></td>
@@ -164,3 +135,14 @@ function asignaturas_list(array $r): string {
 </div></div>
 
 <?php include __DIR__ . '/_footer.php'; ?>
+<script>
+document.querySelectorAll('.ajax-buscar').forEach(input => {
+  const lista = input.parentElement.querySelector('.ajax-lista');
+  const target = document.getElementById(input.dataset.target);
+  input.addEventListener('input', function() {
+    const q = this.value.trim(); if (q.length < 2) { lista.innerHTML=''; return; }
+    fetch('api/buscar_catalogo.php?tipo='+encodeURIComponent(this.dataset.tipo)+'&q='+encodeURIComponent(q))
+      .then(r=>r.json()).then(d=>{ lista.innerHTML=''; (d.items||[]).forEach(it=>{ const b=document.createElement('button'); b.type='button'; b.className='list-group-item list-group-item-action'; b.textContent=it.label; b.onclick=()=>{input.value=it.label; target.value=it.id; lista.innerHTML='';}; lista.appendChild(b); });});
+  });
+});
+</script>
