@@ -8,7 +8,7 @@ function validarCedulaEcuatoriana(string $cedula): bool {
     if ($provincia < 1 || $provincia > 24) return false;
 
     $tercer = intval($cedula[2]);
-    if ($tercer > 5) return false;
+    if ($tercer > 7) return false;
 
     $coef = [2,1,2,1,2,1,2,1,2];
     $suma = 0;
@@ -485,7 +485,7 @@ function validarCedulaEC(cedula) {
   if (provincia < 1 || provincia > 24) return false;
 
   const tercer = parseInt(cedula[2], 10);
-  if (tercer > 5) return false;
+  if (tercer > 7) return false;
 
   const coef = [2,1,2,1,2,1,2,1,2];
   let suma = 0;
