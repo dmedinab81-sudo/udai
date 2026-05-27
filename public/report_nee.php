@@ -36,7 +36,7 @@ function log_error($msg) {
 
 // Obtener listas para filtros (silencioso en caso de error)
 try {
-    $ubicaciones = $pdo->query("SELECT id, mes, zona, distrito FROM ubicacion ORDER BY mes")->fetchAll(PDO::FETCH_ASSOC);
+    $ubicaciones = $pdo->query("SELECT id, anio, mes, zona, distrito FROM ubicacion ORDER BY anio, mes")->fetchAll(PDO::FETCH_ASSOC);
     $docentes_apoyo = $pdo->query("SELECT id, cedula, nombres FROM docente_apoyo ORDER BY nombres")->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
     log_error("Error fetching filter lists: " . $e->getMessage());
@@ -88,6 +88,7 @@ $created_select = $has_created ? "rn.created_at AS created_at," : "'' AS created
 $sql = "SELECT
     rn.id AS id,
     {$created_select}
+    COALESCE(u.anio, '') AS anio,
     COALESCE(u.mes, '') AS mes,
     COALESCE(u.zona, '') AS zona,
     COALESCE(u.distrito, '') AS distrito,
@@ -151,6 +152,7 @@ if ($export) {
     try {
         // Encabezados (incluyen ID y CREATED_AT al inicio)
         $headers = [
+            'AÑO',
             'MES',
             'ZONA',
             'DISTRITO',
@@ -217,7 +219,7 @@ if ($export) {
                 $fn = $row['estudiante_fecha_nacimiento'] ?? '';
                 $fn_out = $fn;
                 $csvRow = [
-                    $row['mes'],$row['zona'],$row['distrito'],$row['da_cedula'],$row['da_nombres'],
+					$row['anio'],$row['mes'],$row['zona'],$row['distrito'],$row['da_cedula'],$row['da_nombres'],
                     $row['institucion_nombre'],$row['institucion_amie'],$row['institucion_telefono'],
                     $row['estudiante_tipo_identificacion'],$row['estudiante_identificacion'],$row['estudiante_nombres'],$fn_out,$row['estudiante_edad'],
                     $row['nee'],$row['tipo_nee'],$porc_out($row['porcentaje_discapacidad']),$row['genero'],$row['jornada'],$row['nivel'],$row['grado'],
@@ -268,6 +270,7 @@ if ($export) {
             }
 
             $values = [
+                $row['anio'],
                 $row['mes'],
                 $row['zona'],
                 $row['distrito'],
@@ -343,7 +346,7 @@ if ($export) {
                 if ($d) $fn_out = $d->format('j/n/Y');
             }
             $csvValues = [
-                $row['mes'],$row['zona'],$row['distrito'],$row['da_cedula'],$row['da_nombres'],
+                $row['anio'],$row['mes'],$row['zona'],$row['distrito'],$row['da_cedula'],$row['da_nombres'],
                 $row['institucion_nombre'],$row['institucion_amie'],$row['institucion_telefono'],
                 $row['estudiante_tipo_identificacion'],$row['estudiante_identificacion'],$row['estudiante_nombres'],$fn_out,$row['estudiante_edad'],
                 $row['nee'],$row['tipo_nee'],$porc_out($row['porcentaje_discapacidad']),$row['genero'],$row['jornada'],$row['nivel'],$row['grado'],
@@ -424,7 +427,7 @@ try {
         <select name="id_ubicacion" class="form-select">
           <option value="">-- Todas --</option>
           <?php foreach ($ubicaciones as $u): ?>
-            <option value="<?= $u['id'] ?>" <?= ($id_ubicacion && $id_ubicacion == $u['id']) ? 'selected' : '' ?>><?= htmlspecialchars($u['mes'] . ' / ' . $u['zona'] . ' / ' . $u['distrito']) ?></option>
+            <option value="<?= $u['id'] ?>" <?= ($id_ubicacion && $id_ubicacion == $u['id']) ? 'selected' : '' ?>><?= htmlspecialchars($u['anio'] . ' / ' . $u['mes'] . ' / ' . $u['zona'] . ' / ' . $u['distrito']) ?></option>
           <?php endforeach; ?>
         </select>
       </div>
@@ -476,7 +479,7 @@ try {
           <?php else: foreach ($rows_view as $r): ?>
             <tr>
               <td><?= htmlspecialchars($r['id'] ?? '') ?></td>
-              <td><?= htmlspecialchars($r['mes'] . ' / ' . $r['zona'] . ' / ' . $r['distrito']) ?></td>
+              <td><?= htmlspecialchars($r['anio'] . ' / ' . $r['mes'] . ' / ' . $r['zona'] . ' / ' . $r['distrito']) ?></td>
               <td><?= htmlspecialchars($r['da_nombres'] ?? '') ?></td>
               <td><?= htmlspecialchars($r['institucion_nombre'] ?? '') ?></td>
               <td><?= htmlspecialchars($r['estudiante_nombres'] ?? '') ?></td>
